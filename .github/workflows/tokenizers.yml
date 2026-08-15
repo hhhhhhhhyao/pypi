@@ -25,27 +25,25 @@ jobs:
           repository: huggingface/tokenizers
           ref: ${{ env.VERSION }}
 
-      - name: Setup QEMU for loongarch64
+      - name: Setup QEMU for loong64
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: loongarch64
+          platforms: loong64
 
-      - name: Test alpine availability
+      - name: Build wheel in ghcr.io/loong64/debian:trixie-slim
         run: |
-          docker pull --platform linux/loongarch64 alpine:latest && echo "alpine OK" || echo "alpine FAIL"
-
-      - name: Build wheel in alpine (with self-compiled python3.8)
-        run: |
-          docker run --rm --platform linux/loongarch64 \
+          docker run --rm --platform linux/loong64 \
             -v ${{ github.workspace }}:/work \
             -w /work/bindings/python \
-            alpine:latest \
-            sh -c '
+            ghcr.io/loong64/debian:trixie-slim \
+            bash -c '
               set -e
               echo "=== Step 1: Install build deps ==="
-              apk add --no-cache build-base wget openssl-dev zlib-dev bzip2-dev \
-                readline-dev sqlite-dev gdbm-dev ncurses-dev xz-dev tk-dev \
-                libffi-dev linux-headers curl
+              apt-get update
+              apt-get install -y wget build-essential libssl-dev zlib1g-dev \
+                libncurses5-dev libffi-dev libsqlite3-dev \
+                libreadline-dev libtk8.6-dev libgdbm-dev libbz2-dev \
+                liblzma-dev uuid-dev curl
 
               echo "=== Step 2: Compile Python 3.8 from source ==="
               cd /tmp
@@ -70,7 +68,7 @@ jobs:
 
               echo "=== Step 5: Build tokenizers wheel ==="
               cd /work/bindings/python
-              maturin build --release --out dist -i /usr/local/python38/bin/python3.8 --manylinux 2_28
+              maturin build --release --out dist -i /usr/local/python38/bin/python3.8
               echo "=== Built wheels ==="
               ls -la dist/
             '
