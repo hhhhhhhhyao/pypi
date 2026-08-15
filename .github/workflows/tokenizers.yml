@@ -25,16 +25,18 @@ jobs:
               apt-get install -y wget build-essential libssl-dev zlib1g-dev \
                 libncurses5-dev libffi-dev libsqlite3-dev \
                 libreadline-dev libgdbm-dev libbz2-dev \
-                liblzma-dev uuid-dev curl git
+                liblzma-dev uuid-dev curl git autoconf
               # Clone tokenizers source at v0.15.2
               git clone --depth 1 --branch v0.15.2 https://github.com/huggingface/tokenizers.git /tmp/tok
               # Compile Python 3.8 from source
               wget -q https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
               tar xzf Python-3.8.18.tgz -C /tmp/tok/bindings/python/
               cd /tmp/tok/bindings/python/Python-3.8.18
-              curl -sSL -o config.guess "https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess"
-              curl -sSL -o config.sub "https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub"
-              chmod +x config.guess config.sub
+              # Use Debian-packaged config.guess/config.sub (already supports loongarch64)
+              cp -f /usr/share/misc/config.guess .
+              cp -f /usr/share/misc/config.sub .
+              head -1 config.sub
+              echo "---"
               ./configure --build=loongarch64-unknown-linux-gnu --host=loongarch64-unknown-linux-gnu \
                 --prefix=/usr/local/python38 --enable-optimizations=no --with-ensurepip=install
               make -j4 && make install
