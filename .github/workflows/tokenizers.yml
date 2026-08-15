@@ -1,77 +1,86 @@
 name: build (tokenizers)
-
 on:
   workflow_dispatch:
     inputs:
       version:
-        default: 'latest'
+        default: '0.15.2'
         description: 'Package version'
         type: string
         required: true
-  schedule:
-    - cron: '0 17 * * *'
 
 jobs:
-  cross_build_wheels:
+  build_wheels:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - target: loongarch64-unknown-linux-gnu
-            arch: loongarch64
-            manylinux: 'manylinux_2_36'
-          - target: "loongarch64-unknown-linux-musl"
-            arch: loongarch64
-            manylinux: "musllinux_1_2"
-
     steps:
       - name: Get Source Code
         run: |
           package=tokenizers
-          version="0.15.2"  
+          version=${{ github.event.inputs.version }}
           echo "Building package: ${package} version: ${version}"
           echo "VERSION=v${version}" >> $GITHUB_ENV
 
-      - name: Checkout
-        if: env.BUILD != 'false'
+      - name: Checkout tokenizers source
         uses: actions/checkout@v6
         with:
           repository: huggingface/tokenizers
           ref: ${{ env.VERSION }}
 
-      - name: set up python
-        if: env.BUILD != 'false'
-        uses: actions/setup-python@v6
+      - name: Setup QEMU for loongarch64
+        uses: docker/setup-qemu-action@v3
         with:
-          python-version: 3.x
+          platforms: loongarch64
 
-      - name: Debug - List python in manylinux image
+      - name: List pythons in loong64 image
         run: |
           docker run --rm --platform linux/loongarch64 \
-            --workdir / \
-            docker.io/quentinmayo/manylinux_2_28-cross:loongarch64 \
-            bash -c "ls /opt/python/ 2>/dev/null; which python3.8; which python3.9; which python3.10; which python3.11"
+            ghcr.io/loong64/manylinux_2_28_loongarch64:latest \
+            bash -c "ls /opt/python/ 2>/dev/null; echo '---'; which python3.8; which python3.9; which python3.10"
 
-      - name: Build wheels
-        if: env.BUILD != 'false'
-        uses: PyO3/maturin-action@v1
-        with:
-          working-directory: ./bindings/python
-          target: ${{ matrix.platform.target }}
-          manylinux: manylinux_2_28
-          args: --release --out dist -i python3.8
-          rust-toolchain: stable
-          sccache: false
-          docker-options: -e CI
-
-      - name: Check wheel
+      - name: Build wheel in loong64 manylinux container
         run: |
-          ls -al bindings/python/dist/*.whl || exit 0
-          echo "upload=true" >> $GITHUB_ENV
+          docker run --rm --platform linux/loongarch64 \
+            -v ${{ github.workspace }}:/work \
+            -w /work/bindings/python \
+            ghcr.io/loong64/manylinux_2_28_loongarch64:latest \
+            bash -c '
+              set -e
+              echo "=== Available Pythons ==="
+              ls /opt/python/ 2>/dev/null || echo "no /opt/python"
+
+              # Find python3.8
+              PYTHON_BIN=""
+              for path in /opt/python/cp38-cp38/bin/python3.8 /usr/bin/python3.8 /usr/local/bin/python3.8; do
+                if [ -x "$path" ]; then
+                  PYTHON_BIN="$path"
+                  break
+                fi
+              done
+              if [ -z "$PYTHON_BIN" ]; then
+                echo "ERROR: python3.8 not found"
+                ls /opt/python/ 2>/dev/null
+                exit 1
+              fi
+              echo "=== Using python: $PYTHON_BIN ==="
+              $PYTHON_BIN --version
+
+              # Install Rust
+              curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+              source ~/.cargo/env
+              rustup target add loongarch64-unknown-linux-gnu
+              echo "Rust installed: $(rustc --version)"
+
+              # Install maturin
+              $PYTHON_BIN -m pip install --upgrade pip
+              $PYTHON_BIN -m pip install maturin
+              echo "maturin installed: $(maturin --version)"
+
+              # Build wheel
+              maturin build --release --out dist -i $PYTHON_BIN
+              echo "=== Built wheels ==="
+              ls -la dist/
+            '
 
       - name: Upload wheels as artifact
-        if: env.upload == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: tokenizers-wheel
