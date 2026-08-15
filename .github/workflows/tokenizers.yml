@@ -46,6 +46,13 @@ jobs:
         with:
           python-version: 3.x
 
+      - name: Debug - List python in manylinux image
+        run: |
+          docker run --rm --platform linux/loongarch64 \
+            --workdir / \
+            docker.io/quentinmayo/manylinux_2_28-cross:loongarch64 \
+            bash -c "ls /opt/python/ 2>/dev/null; which python3.8; which python3.9; which python3.10; which python3.11"
+
       - name: Build wheels
         if: env.BUILD != 'false'
         uses: PyO3/maturin-action@v1
