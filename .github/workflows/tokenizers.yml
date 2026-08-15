@@ -1,36 +1,4 @@
-name: build (tokenizers)
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        default: '0.15.2'
-        description: 'Package version'
-        type: string
-        required: true
-
-jobs:
-  build_wheels:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get Source Code
-        run: |
-          package=tokenizers
-          version=${{ github.event.inputs.version }}
-          echo "Building package: ${package} version: ${version}"
-          echo "VERSION=v${version}" >> $GITHUB_ENV
-
-      - name: Checkout tokenizers source
-        uses: actions/checkout@v6
-        with:
-          repository: huggingface/tokenizers
-          ref: ${{ env.VERSION }}
-
-      - name: Setup QEMU for loong64
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: loong64
-
-     name: Build tokenizers wheel for loongarch64 py38
+name: Build tokenizers wheel for loongarch64 py38
 
 on:
   workflow_dispatch:
