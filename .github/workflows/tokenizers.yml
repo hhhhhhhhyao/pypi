@@ -30,52 +30,45 @@ jobs:
         with:
           platforms: loongarch64
 
-      - name: List pythons in loong64 image
-        run: |
-          docker run --rm --platform linux/loongarch64 \
-            ghcr.io/loong64/manylinux_2_28_loongarch64:latest \
-            bash -c "ls /opt/python/ 2>/dev/null; echo '---'; which python3.8; which python3.9; which python3.10"
-
-      - name: Build wheel in loong64 manylinux container
+      - name: Build wheel in debian trixie (with self-compiled python3.8)
         run: |
           docker run --rm --platform linux/loongarch64 \
             -v ${{ github.workspace }}:/work \
             -w /work/bindings/python \
-            ghcr.io/loong64/manylinux_2_28_loongarch64:latest \
+            debian:trixie-slim \
             bash -c '
               set -e
-              echo "=== Available Pythons ==="
-              ls /opt/python/ 2>/dev/null || echo "no /opt/python"
+              echo "=== Step 1: Install build deps ==="
+              apt-get update
+              apt-get install -y wget build-essential libssl-dev zlib1g-dev \
+                libncurses5-dev libffi-dev libsqlite3-dev \
+                libreadline-dev libtk8.6-dev libgdbm-dev libbz2-dev \
+                liblzma-dev uuid-dev curl
 
-              # Find python3.8
-              PYTHON_BIN=""
-              for path in /opt/python/cp38-cp38/bin/python3.8 /usr/bin/python3.8 /usr/local/bin/python3.8; do
-                if [ -x "$path" ]; then
-                  PYTHON_BIN="$path"
-                  break
-                fi
-              done
-              if [ -z "$PYTHON_BIN" ]; then
-                echo "ERROR: python3.8 not found"
-                ls /opt/python/ 2>/dev/null
-                exit 1
-              fi
-              echo "=== Using python: $PYTHON_BIN ==="
-              $PYTHON_BIN --version
+              echo "=== Step 2: Compile Python 3.8 from source ==="
+              cd /tmp
+              wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
+              tar xzf Python-3.8.18.tgz
+              cd Python-3.8.18
+              ./configure --prefix=/usr/local/python38 --enable-optimizations=no --with-ensurepip=install
+              make -j4
+              make install
+              /usr/local/python38/bin/python3.8 --version
+              /usr/local/python38/bin/python3.8 -m pip install --upgrade pip
 
-              # Install Rust
+              echo "=== Step 3: Install Rust ==="
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
               source ~/.cargo/env
               rustup target add loongarch64-unknown-linux-gnu
-              echo "Rust installed: $(rustc --version)"
+              echo "Rust: $(rustc --version)"
 
-              # Install maturin
-              $PYTHON_BIN -m pip install --upgrade pip
-              $PYTHON_BIN -m pip install maturin
-              echo "maturin installed: $(maturin --version)"
+              echo "=== Step 4: Install maturin ==="
+              /usr/local/python38/bin/python3.8 -m pip install maturin
+              echo "maturin: $(maturin --version)"
 
-              # Build wheel
-              maturin build --release --out dist -i $PYTHON_BIN
+              echo "=== Step 5: Build tokenizers wheel ==="
+              cd /work/bindings/python
+              maturin build --release --out dist -i /usr/local/python38/bin/python3.8
               echo "=== Built wheels ==="
               ls -la dist/
             '
