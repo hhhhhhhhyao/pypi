@@ -78,13 +78,9 @@ jobs:
           ls -al bindings/python/dist/*.whl || exit 0
           echo "upload=true" >> $GITHUB_ENV
 
-      - name: Upload wheels
+      - name: Upload wheels as artifact
         if: env.upload == 'true'
-        run: |
-          pip install twine==6.0.1
-          for file in bindings/python/dist/*.whl; do
-            twine upload --repository-url https://gitlab.com/api/v4/projects/65746188/packages/pypi $file || true
-          done
-        env:
-          TWINE_USERNAME: ${{ github.repository_owner }}
-          TWINE_PASSWORD: ${{ secrets.GL_TOKEN }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tokenizers-wheel
+          path: bindings/python/dist/*.whl
