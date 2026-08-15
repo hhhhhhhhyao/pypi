@@ -42,7 +42,7 @@ jobs:
               apt-get update
               apt-get install -y wget build-essential libssl-dev zlib1g-dev \
                 libncurses5-dev libffi-dev libsqlite3-dev \
-                libreadline-dev libtk8.6-dev libgdbm-dev libbz2-dev \
+                libreadline-dev libgdbm-dev libbz2-dev \
                 liblzma-dev uuid-dev curl
 
               echo "=== Step 2: Compile Python 3.8 from source ==="
