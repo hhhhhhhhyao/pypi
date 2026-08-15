@@ -50,7 +50,11 @@ jobs:
               wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
               tar xzf Python-3.8.18.tgz
               cd Python-3.8.18
-              ./configure --prefix=/usr/local/python38 --enable-optimizations=no --with-ensurepip=install
+              curl -sSL -o config.guess 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess'
+              curl -sSL -o config.sub 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub'
+              chmod +x config.guess config.sub
+              ./configure --build=loongarch64-unknown-linux-gnu --host=loongarch64-unknown-linux-gnu \ 
+                 --prefix=/usr/local/python38 --enable-optimizations=no --with-ensurepip=install
               make -j4
               make install
               /usr/local/python38/bin/python3.8 --version
