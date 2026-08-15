@@ -25,18 +25,16 @@ jobs:
               apt-get install -y wget build-essential libssl-dev zlib1g-dev \
                 libncurses5-dev libffi-dev libsqlite3-dev \
                 libreadline-dev libgdbm-dev libbz2-dev \
-                liblzma-dev uuid-dev curl git autoconf
+                liblzma-dev uuid-dev curl git
               # Clone tokenizers source at v0.15.2
               git clone --depth 1 --branch v0.15.2 https://github.com/huggingface/tokenizers.git /tmp/tok
               # Compile Python 3.8 from source
               wget -q https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
               tar xzf Python-3.8.18.tgz -C /tmp/tok/bindings/python/
               cd /tmp/tok/bindings/python/Python-3.8.18
-              # Use Debian-packaged config.guess/config.sub (already supports loongarch64)
-              cp -f /usr/share/misc/config.guess .
-              cp -f /usr/share/misc/config.sub .
-              head -1 config.sub
-              echo "---"
+              curl -sSL -o config.guess "https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess"
+              curl -sSL -o config.sub "https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub"
+              chmod +x config.guess config.sub
               ./configure --build=loongarch64-unknown-linux-gnu --host=loongarch64-unknown-linux-gnu \
                 --prefix=/usr/local/python38 --enable-optimizations=no --with-ensurepip=install
               make -j4 && make install
@@ -44,20 +42,16 @@ jobs:
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
               source ~/.cargo/env
               rustup target add loongarch64-unknown-linux-gnu
-              /usr/local/python38/bin/python3.8 -m pip install --upgrade "pip<24.1"
-              /usr/local/python38/bin/python3.8 -m pip install --upgrade "setuptools==75.3.4" wheel "tomli>=1.1.0"
-              # Install maturin from prebuilt binary to avoid building from source on loongarch64
-              /usr/local/python38/bin/python3.8 -m pip install --only-binary :all: maturin || (
-                wget -q https://github.com/PyO3/maturin/releases/download/v1.5.1/maturin-1.5.1-cp38-none-linux_loongarch64.whl -O /tmp/maturin.whl 2>/dev/null || \
-                wget -q https://github.com/PyO3/maturin/releases/download/v1.5.1/maturin-1.5.1-cp37-abi3-linux_loongarch64.whl -O /tmp/maturin.whl 2>/dev/null || \
-                ( wget -q https://github.com/PyO3/maturin/releases/download/v1.5.1/maturin-musl-1.5.1-loongarch64-unknown-linux-musl.tar.gz -O /tmp/maturin.tgz && \
-                  tar xzf /tmp/maturin.tgz -C /usr/local/bin --strip-components=1 maturin-musl-1.5.1-loongarch64-unknown-linux-musl/maturin && \
-                  maturin --version )
-              )
-              ls -la /usr/local/bin/maturin 2>/dev/null || /usr/local/python38/bin/python3.8 -m pip install --no-deps maturin==1.5.1
+              /usr/local/python38/bin/python3.8 -m pip install --upgrade pip
+              # Install maturin from official prebuilt loongarch64 (glibc) binary
+              wget -q https://github.com/PyO3/maturin/releases/download/v1.11.1/maturin-loongarch64-unknown-linux-gnu.tar.gz -O /tmp/maturin.tgz
+              tar xzf /tmp/maturin.tgz -C /tmp
+              MBIN=$(find /tmp -type f -name maturin | head -1)
+              install -m 755 "$MBIN" /usr/local/bin/maturin
+              maturin --version
               # Build tokenizers wheel
               cd /tmp/tok/bindings/python
-              maturin build --release --out /work/dist -i /usr/local/python38/bin/python3.8
+              /usr/local/python38/bin/python3.8 -m maturin build --release --out /work/dist -i /usr/local/python38/bin/python3.8
               echo "=== dist contents ==="
               ls -la /work/dist/
             '
