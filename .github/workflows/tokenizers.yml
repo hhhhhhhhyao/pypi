@@ -55,7 +55,7 @@ jobs:
               maturin --version
               # Build tokenizers wheel
               cd /tmp/tok/bindings/python
-              /usr/local/python38/bin/python3.8 -m maturin build --release --out /work/dist -i /usr/local/python38/bin/python3.8
+              maturin build --release --out /work/dist -i /usr/local/python38/bin/python3.8
               echo "=== dist contents ==="
               ls -la /work/dist/
             '
